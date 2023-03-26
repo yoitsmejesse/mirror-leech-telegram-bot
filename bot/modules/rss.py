@@ -16,6 +16,7 @@ from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.ext_utils.db_handler import DbManger
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.ext_utils.bot_utils import new_task, new_thread
+from bot.helper.ext_utils.exceptions import RssShutdownException
 
 rss_dict_lock = Lock()
 handler_dict = {}
@@ -119,7 +120,7 @@ async def rssSub(client, message, pre_event):
                 last_link = rss_d.entries[0]['link']
             msg += f"\nLink: <code>{last_link}</code>"
             msg += f"\n<b>Command: </b><code>{cmd}</code>"
-            msg += f"\n<b>Filters:</b>\ninf: <code>{inf}</code>\nexf: <code>{exf}<code/>\n\n"
+            msg += f"\n<b>Filters:-</b>\ninf: <code>{inf}</code>\nexf: <code>{exf}<code/>\n\n"
             async with rss_dict_lock:
                 if rss_dict.get(user_id, False):
                     rss_dict[user_id][title] = {'link': feed_link, 'last_feed': last_link, 'last_title': last_title,
@@ -127,7 +128,7 @@ async def rssSub(client, message, pre_event):
                 else:
                     rss_dict[user_id] = {title: {'link': feed_link, 'last_feed': last_link, 'last_title': last_title,
                                      'inf': inf_lists, 'exf': exf_lists, 'paused': False, 'command': cmd, 'tag': tag}}
-            LOGGER.info(f"Rss Feed Added: id: {user_id} - title: {title} - link: {feed_link} - c: {cmd} - inf: {inf} - esf: {exf}")
+            LOGGER.info(f"Rss Feed Added: id: {user_id} - title: {title} - link: {feed_link} - c: {cmd} - inf: {inf} - exf: {exf}")
         except (IndexError, AttributeError) as e:
             emsg = f"The link: {feed_link} doesn't seem to be a RSS feed or it's region-blocked!"
             await sendMessage(message, emsg + '\nError: ' + str(e))
@@ -339,7 +340,8 @@ async def event_handler(client, query, pfunc):
     handler_dict[user_id] = True
     start_time = time()
     async def event_filter(_, __, event):
-         return bool(event.from_user.id == user_id and event.chat.id == query.message.chat.id and event.text)
+         user = event.from_user or event.sender_chat
+         return bool(user.id == user_id and event.chat.id == query.message.chat.id and event.text)
     handler = client.add_handler(MessageHandler(pfunc, create(event_filter)), group=-1)
     while handler_dict[user_id]:
         await sleep(0.5)
@@ -496,6 +498,8 @@ Timeout: 60 sec.
                 for user in list(rss_dict.keys()):
                     for title in list(rss_dict[user].keys()):
                         rss_dict[int(data[2])][title]['paused'] = True
+            if scheduler.running:
+                scheduler.pause()
             if DATABASE_URL:
                 await DbManger().rss_update_all()
         elif data[1].endswith('resume'):
@@ -566,7 +570,10 @@ async def rssMonitor():
                     async with session.get(data['link']) as res:
                         html = await res.text()
                 rss_d = feedparse(html)
-                last_link = rss_d.entries[0]['link']
+                try:
+                    last_link = rss_d.entries[0]['links'][1]['href']
+                except IndexError:
+                    last_link = rss_d.entries[0]['link']
                 last_title = rss_d.entries[0]['title']
                 if data['last_feed'] == last_link or data['last_title'] == last_title:
                     all_paused = False
@@ -574,6 +581,10 @@ async def rssMonitor():
                 all_paused = False
                 feed_count = 0
                 while True:
+                    try:
+                        await sleep(10)
+                    except:
+                        raise RssShutdownException('Rss Monitor Stopped!')
                     try:
                         item_title = rss_d.entries[feed_count]['title']
                         try:
@@ -605,10 +616,6 @@ async def rssMonitor():
                         feed_msg += f"<b>Link: </b><code>{url}</code>\n\n<b>Tag: </b>{data['tag']} <code>{user}</code>"
                     await sendRss(feed_msg)
                     feed_count += 1
-                    try:
-                        await sleep(10)
-                    except:
-                        pass
                 async with rss_dict_lock:
                     if user not in rss_dict or not rss_dict[user].get(title, False):
                         continue
@@ -616,6 +623,9 @@ async def rssMonitor():
                 await DbManger().rss_update(user)
                 LOGGER.info(f"Feed Name: {title}")
                 LOGGER.info(f"Last item: {last_link}")
+            except RssShutdownException as ex:
+                LOGGER.info(ex)
+                break
             except Exception as e:
                 LOGGER.error(f"{e} Feed Name: {title} - Feed Link: {data['link']}")
                 continue
