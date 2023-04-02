@@ -13,7 +13,7 @@ from bot.helper.mirror_utils.download_utils.yt_dlp_download_helper import Youtub
 from bot.helper.mirror_utils.rclone_utils.list import RcloneList
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.filters import CustomFilters
-from bot.helper.listener import MirrorLeechListener
+from bot.helper.listeners.tasks_listener import MirrorLeechListener
 
 listener_dict = {}
 
@@ -181,7 +181,7 @@ Check all yt-dlp api options from this <a href='https://github.com/yt-dlp/yt-dlp
             await sendMessage(message, up)
             return
 
-    listener = MirrorLeechListener(message, isZip, isLeech=isLeech, pswd=pswd, tag=tag, sameDir=sameDir, rcFlags=rcf, upload=up)
+    listener = MirrorLeechListener(message, isZip, isLeech=isLeech, pswd=pswd, tag=tag, sameDir=sameDir, rcFlags=rcf, upPath=up)
     if 'mdisk.me' in link:
         name, link = await _mdisk(link, name)
     ydl = YoutubeDLHelper(listener)
