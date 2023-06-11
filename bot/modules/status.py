@@ -12,7 +12,7 @@ from bot.helper.ext_utils.bot_utils import get_readable_file_size, get_readable_
 
 
 @new_task
-async def mirror_status(client, message):
+async def mirror_status(_, message):
     async with download_dict_lock:
         count = len(download_dict)
     if count == 0:
@@ -20,7 +20,7 @@ async def mirror_status(client, message):
         free = get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)
         msg = 'No Active Downloads !\n___________________________'
         msg += f"\n<b>CPU:</b> {cpu_percent()}% | <b>FREE:</b> {free}" \
-                   f"\n<b>RAM:</b> {virtual_memory().percent}% | <b>UPTIME:</b> {currentTime}"
+            f"\n<b>RAM:</b> {virtual_memory().percent}% | <b>UPTIME:</b> {currentTime}"
         reply_message = await sendMessage(message, msg)
         await auto_delete_message(message, reply_message)
     else:
@@ -30,10 +30,12 @@ async def mirror_status(client, message):
             if Interval:
                 Interval[0].cancel()
                 Interval.clear()
-                Interval.append(setInterval(config_dict['STATUS_UPDATE_INTERVAL'], update_all_messages))
+                Interval.append(setInterval(
+                    config_dict['STATUS_UPDATE_INTERVAL'], update_all_messages))
+
 
 @new_task
-async def status_pages(client, query):
+async def status_pages(_, query):
     await query.answer()
     data = query.data.split()
     if data[1] == "ref":
@@ -42,5 +44,6 @@ async def status_pages(client, query):
         await turn_page(data)
 
 
-bot.add_handler(MessageHandler(mirror_status, filters=command(BotCommands.StatusCommand) & CustomFilters.authorized))
+bot.add_handler(MessageHandler(mirror_status, filters=command(
+    BotCommands.StatusCommand) & CustomFilters.authorized))
 bot.add_handler(CallbackQueryHandler(status_pages, filters=regex("^status")))

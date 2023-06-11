@@ -11,7 +11,7 @@ from bot.helper.ext_utils.bot_utils import getDownloadByGid, getAllDownload, Mir
 from bot.helper.telegram_helper import button_build
 
 
-async def cancel_mirror(client, message):
+async def cancel_mirror(_, message):
     user_id = message.from_user.id
     msg = message.text.split()
     if len(msg) > 1:
@@ -38,7 +38,7 @@ async def cancel_mirror(client, message):
     obj = dl.download()
     await obj.cancel_download()
 
-@new_task
+
 async def cancel_all(status):
     matches = await getAllDownload(status)
     if not matches:
@@ -49,8 +49,8 @@ async def cancel_all(status):
         await sleep(1)
     return True
 
-@new_task
-async def cancell_all_buttons(client, message):
+
+async def cancell_all_buttons(_, message):
     async with download_dict_lock:
         count = len(download_dict)
     if count == 0:
@@ -72,8 +72,9 @@ async def cancell_all_buttons(client, message):
     can_msg = await sendMessage(message, 'Choose tasks to cancel.', button)
     await auto_delete_message(message, can_msg)
 
+
 @new_task
-async def cancel_all_update(client, query):
+async def cancel_all_update(_, query):
     data = query.data.split()
     message = query.message
     reply_to = message.reply_to_message
@@ -87,7 +88,9 @@ async def cancel_all_update(client, query):
             await sendMessage(reply_to, f"No matching tasks for {data[1]}!")
 
 
-
-bot.add_handler(MessageHandler(cancel_mirror, filters=command(BotCommands.CancelMirror) & CustomFilters.authorized))
-bot.add_handler(MessageHandler(cancell_all_buttons, filters=command(BotCommands.CancelAllCommand) & CustomFilters.sudo))
-bot.add_handler(CallbackQueryHandler(cancel_all_update, filters=regex("^canall") & CustomFilters.sudo))
+bot.add_handler(MessageHandler(cancel_mirror, filters=command(
+    BotCommands.CancelMirror) & CustomFilters.authorized))
+bot.add_handler(MessageHandler(cancell_all_buttons, filters=command(
+    BotCommands.CancelAllCommand) & CustomFilters.sudo))
+bot.add_handler(CallbackQueryHandler(cancel_all_update,
+                filters=regex("^canall") & CustomFilters.sudo))
